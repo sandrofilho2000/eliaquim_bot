@@ -1,4 +1,4 @@
-# scrapy runspider products.py -o products.json --loglevel=CRITICAL
+# scrapy runspider engine.py -o products.json --loglevel=CRITICAL
 
 import re
 import scrapy
@@ -6,7 +6,6 @@ from scrapy_playwright.page import PageMethod
 import os
 import requests
 from dotenv import load_dotenv
-
 import re
 from urllib.parse import urlparse
 
@@ -17,7 +16,8 @@ def normalize_ml_url(url: str) -> str:
     path = re.sub(r"_NoIndex_True.*", "", path)
     return f"https://lista.mercadolivre.com.br/{path}"
 
-class ProductsSpider(scrapy.Spider):
+
+class Products(scrapy.Spider):
     load_dotenv()
     name = "products"
     output_file = "products.json"
@@ -47,18 +47,7 @@ class ProductsSpider(scrapy.Spider):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        response = requests.get(
-            f"{self.API_URL}/api/categories/",
-            headers={
-                "Authorization": f"Api-Key {self.API_KEY}",
-                "Accept": "application/json",
-            },
-            timeout=10,
-        )
-
-        response.raise_for_status()
-        self.categories = response.json()
+        
 
     def start_requests(self):
         if not self.categories:
@@ -113,7 +102,6 @@ class ProductsSpider(scrapy.Spider):
             },
             callback=self.parse,
         )
-
 
     def parse(self, response):
         page_number = response.meta.get("page_number", 1)
