@@ -3,8 +3,11 @@ from tkinter import ttk
 import requests
 from dotenv import load_dotenv
 import os
+import threading
 import webbrowser
 from scraper.categories import Categories
+from scraper.products import Products
+from scrapy.crawler import CrawlerProcess
 
 # =========================
 # CATEGORIAS
@@ -44,7 +47,7 @@ class CategoriesFrame(ttk.LabelFrame):
 
     def get_active_categories(self):
         return [
-            category["name"]
+            category
             for category in self.categories
             if self.variables[category["id"]].get()
         ]
@@ -163,10 +166,11 @@ class ButtonsFrame(ttk.Frame):
         super().__init__(parent, padding=(0, 10))
         self.categories_frame = categories_frame
         self.logs_frame = logs_frame
+        self._is_running = False
         self._build_ui()
 
     def _build_ui(self):
-        tk.Button(
+        self.start_button = tk.Button(
             self,
             text="Iniciar",
             bg="#2e7d32",
@@ -175,9 +179,34 @@ class ButtonsFrame(ttk.Frame):
             padx=18,
             pady=8,
             command=self._on_start,
-        ).pack(side="left", padx=(0, 12))
+        )
+        self.start_button.pack(side="left", padx=(0, 12))
+
+    def _safe_log(self, message):
+        self.logs_frame.after(0, self.logs_frame.add_log, message)
+
+    def _set_running(self, running):
+        self._is_running = running
+        state = "disabled" if running else "normal"
+        self.start_button.config(state=state)
+
+    def _run_crawlers(self, categories):
+        try:
+            process = CrawlerProcess()
+            for category in categories:
+                process.crawl(Products, category=category)
+            process.start(install_signal_handlers=False)
+            self._safe_log("Processamento finalizado.")
+        except Exception as exc:
+            self._safe_log(f"Erro ao executar o crawler: {exc}")
+        finally:
+            self.logs_frame.after(0, self._set_running, False)
 
     def _on_start(self):
+        if self._is_running:
+            self.logs_frame.add_log("Processamento em andamento. Aguarde concluir.")
+            return
+
         categories = self.categories_frame.get_active_categories()
 
         if not categories:
@@ -185,8 +214,16 @@ class ButtonsFrame(ttk.Frame):
             return
 
         self.logs_frame.add_log("\n\n▶️ Iniciando processamento:")
-        for cat in categories:
-            self.logs_frame.add_log(f"• {cat}")
+        for category in categories:
+            self.logs_frame.add_log(f"• {category['name']}")
+
+        self._set_running(True)
+        thread = threading.Thread(
+            target=self._run_crawlers,
+            args=(categories,),
+            daemon=True,
+        )
+        thread.start()
 
 
 # =========================

@@ -45,23 +45,25 @@ class Products(scrapy.Spider):
         },
     }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, category=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+        self.category = category
+
 
     def start_requests(self):
-        if not self.categories:
+        category = self.category
+        if not category:
             self.logger.warning("Nenhuma categoria carregada. Verifique a API.")
             return
 
-        for category in self.categories:
-            if category.get("active", True):
-                yield self.make_playwright_request(
-                    category["link"], page_number=1, category_id=category["id"]
-                )
+        if category.get("active", True):
+            yield self.make_playwright_request(
+                category["link"], page_number=1, category_id=category["id"]
+            )
+
 
     def make_playwright_request(self, url, page_number=1, category_id=None):
-        return scrapy.Request(
+        response = scrapy.Request(
             url,
             headers={
                 "User-Agent": (
@@ -102,6 +104,8 @@ class Products(scrapy.Spider):
             },
             callback=self.parse,
         )
+        print("RESPONSE: ", response)
+        return response
 
     def parse(self, response):
         page_number = response.meta.get("page_number", 1)
